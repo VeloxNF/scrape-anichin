@@ -24,8 +24,8 @@ export default async function handler(req, res) {
     // ----- SINOPSIS -----
     // Ambil bagian Indonesia aja
     let synopsis = "-";
-    if ($(".entry-content").length) {
-    synopsis = $(".entry-content").html()?.trim() || "-";
+    if ($(".desc.mindes").length) {
+    synopsis = $(".desc.mindes").html()?.trim() || "-";
     }
 
     // scrape info detail di anichin
