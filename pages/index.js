@@ -5,16 +5,16 @@ export default function Home() {
   const [html, setHtml] = useState("");
 
   const handleScrape = async () => {
-  const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
-  const data = await res.json();
+    const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
 
-  if (data.error) {
-    setHtml(data.error);
-    return;
-  }
+    if (data.error) {
+      setHtml(data.error);
+      return;
+    }
 
-  // Masukin data lu ke template HTML
-  const html = `
+    // ⬇️ HATI-HATI DI SINI: ganti epList → data.epList
+    const html = `
 <!-- Gambar Poster -->
 <div class="separator" style="clear: both;"><a href="${data.poster}" style="display: block; padding: 1em 0; text-align: center;"><img alt="" border="0" height="320" src="${data.poster}"/></a></div>
 
@@ -98,7 +98,7 @@ export default function Home() {
     </div>
     <div id="server">
       <ul id="Server-1" class="serverEpisode" style="display: block;">
-        ${epList}
+        ${data.epList}
       </ul>
     </div>
   </div>
@@ -164,8 +164,7 @@ document.querySelectorAll('.DagPlayOpt').forEach(function(item) {
 document.querySelector('.DagPlayOpt.on')?.click();
 
 document.addEventListener("DOMContentLoaded", function() {
-  document.getElementById('syn-target').innerHTML =
-    \`${data.synopsis}\`;
+  document.getElementById('syn-target').innerHTML = \`${data.synopsis}\`;
   document.querySelector(".js-status").textContent = "${data.info.status}";
   document.querySelector(".js-studio").textContent = "${data.info.studio}";
   document.querySelector(".js-duration").textContent = "${data.info.durasi}";
@@ -202,9 +201,32 @@ document.addEventListener("DOMContentLoaded", function() {
   color: #ffffff;
 }
 </style>
-  `;
+    `;
 
-  setHtml(html);
-};
+    setHtml(html);
+  };
 
+  return (
+    <div>
+      <h1>Scrape Anichin</h1>
+      <input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="Paste URL Anichin di sini..."
+        style={{ width: "500px", marginRight: "10px" }}
+      />
+      <button onClick={handleScrape}>Scrape</button>
+
+      <div
+        style={{
+          marginTop: "20px",
+          background: "#1e1e1e",
+          padding: "20px",
+          color: "#fff"
+        }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
+  );
 }
