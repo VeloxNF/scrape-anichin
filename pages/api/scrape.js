@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     synopsis = $(".entry-content").html()?.trim() || "-";
     }
 
-    // ----- INFO (status, studio, durasi, dll) -----
+    // scrape info detail di anichin
     let info = {
     status: "-",
     studio: "-",
@@ -38,61 +38,94 @@ export default async function handler(req, res) {
     network: "-",
     tanggalRilis: "-",
     season: "-",
-    genre: "-"
+    genre: "-",
+    type: "-"
     };
 
-    // Ambil dari .spe span
     $(".spe span").each((i, el) => {
-    const text = $(el).text().trim();
-    if (text.includes("Status:")) info.status = text.replace("Status:", "").trim();
-    if (text.includes("Studio:")) info.studio = $(el).find("a").text().trim();
-    if (text.includes("Duration:")) info.durasi = text.replace("Duration:", "").trim();
-    if (text.includes("Country:")) info.negara = $(el).find("a").text().trim();
-    if (text.includes("Episodes:")) info.episode = text.replace("Episodes:", "").trim();
-    if (text.includes("Network:")) info.network = $(el).find("a").text().trim();
-    if (text.includes("Released:")) info.tanggalRilis = text.replace("Released:", "").trim();
-    if (text.includes("Season:")) info.season = $(el).find("a").text().trim();
+    const label = $(el).find("b").text().toLowerCase().replace(":", "").trim();
+    const value = $(el).find("b").remove().end().text().trim();
+
+    if (label === "status") info.status = value;
+    if (label === "network") info.network = value;
+    if (label === "studio") info.studio = value;
+    if (label === "tanggal rilis") info.tanggalRilis = value;
+    if (label === "durasi") info.durasi = value;
+    if (label === "season") info.season = value;
+    if (label === "negara") info.negara = value;
+    if (label === "tipe") info.type = value;
+    if (label === "episode") info.episode = value;
     });
 
-    // Genre dari .genxed
-    let genres = [];
+    // genre
+    let genre = [];
     $(".genxed a").each((i, el) => {
-    genres.push($(el).text().trim());
+    genre.push($(el).text().trim());
     });
-    if (genres.length) info.genre = genres.join(", ");
-
-    if (info.genre === "-") {
-      info.genre = $(".js-genre").text().trim() || "-";
-    }
+    if (genre.length) info.genre = genre.join(", ");
 
     // ----- EPISODES + DOWNLOADS -----
     let episodeList = [];
 
     $(".DagPlayOpt").each((i, el) => {
-      let embed = $(el).attr("data-embed") || "";
-      let episode = $(el).attr("data-episode") || "-";
-      let downloadAttr = $(el).attr("data-download") || "[]";
+    let serverName = $(el).text().trim().toLowerCase();
 
-      let downloads = [];
-      try {
+    // cuma ambil Dailymotion
+    if (serverName.includes("dailymotion")) {
+        let embed = $(el).attr("data-embed") || "";
+        let episode = $(el).attr("data-episode") || "-";
+        let downloadAttr = $(el).attr("data-download") || "[]";
+
+        let downloads = [];
+        try {
         let parsed = JSON.parse(downloadAttr);
         parsed.forEach((srv) => {
-          srv.qualities.forEach((q) => {
+            srv.qualities.forEach((q) => {
             downloads.push({
-              server: srv.server,
-              quality: q.quality,
-              url: q.url
+                server: srv.server,
+                quality: q.quality,
+                url: q.url
             });
-          });
+            });
         });
-      } catch (e) {}
+        } catch (e) {}
 
-      episodeList.push({
+        episodeList.push({
         episode,
         embed,
         downloads
-      });
+        });
+    }
     });
+
+    // kalau tidak ketemu Dailymotion, fallback ke semua
+    if (episodeList.length === 0) {
+    $(".DagPlayOpt").each((i, el) => {
+        let embed = $(el).attr("data-embed") || "";
+        let episode = $(el).attr("data-episode") || "-";
+        let downloadAttr = $(el).attr("data-download") || "[]";
+
+        let downloads = [];
+        try {
+        let parsed = JSON.parse(downloadAttr);
+        parsed.forEach((srv) => {
+            srv.qualities.forEach((q) => {
+            downloads.push({
+                server: srv.server,
+                quality: q.quality,
+                url: q.url
+            });
+            });
+        });
+        } catch (e) {}
+
+        episodeList.push({
+        episode,
+        embed,
+        downloads
+        });
+    });
+    }
 
     // Kalau nggak ada episode list (halaman episode tunggal), scrape iframe
     if (episodeList.length === 0) {
