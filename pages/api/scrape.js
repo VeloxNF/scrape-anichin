@@ -9,89 +9,73 @@ export default async function handler(req, res) {
   }
 
   try {
-    let htmlRes = await axios.get(url, {
+    const response = await axios.get(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
       }
     });
 
-    let $ = cheerio.load(htmlRes.data);
+    const $ = cheerio.load(response.data);
 
+    // Scrape poster
     let poster = $('meta[property="og:image"]').attr("content") || "";
+
+    // Scrape synopsis
     let synopsis = $("#syn-target").html() || "-";
 
+    // Scrape info
     let info = {
-      status: $(".js-status").text() || "-",
-      studio: $(".js-studio").text() || "-",
-      durasi: $(".js-duration").text() || "-",
-      negara: $(".js-negara").text() || "-",
-      episode: $(".js-episode").text() || "-",
-      network: $(".js-network").text() || "-",
-      tanggalRilis: $(".js-tanggalrilis").text() || "-",
-      season: $(".js-season").text() || "-",
-      genre: $(".js-genre").text() || "-"
+      status: $(".js-status").text().trim() || "-",
+      studio: $(".js-studio").text().trim() || "-",
+      durasi: $(".js-duration").text().trim() || "-",
+      negara: $(".js-negara").text().trim() || "-",
+      episode: $(".js-episode").text().trim() || "-",
+      network: $(".js-network").text().trim() || "-",
+      tanggalRilis: $(".js-tanggalrilis").text().trim() || "-",
+      season: $(".js-season").text().trim() || "-",
+      genre: $(".js-genre").text().trim() || "-"
     };
 
-    let streaming = [];
-    let downloads = [];
-
+    // Scrape all episode blocks
+    let episodeList = [];
     $(".DagPlayOpt").each((i, el) => {
       let embed = $(el).attr("data-embed") || "";
       let episode = $(el).attr("data-episode") || "-";
       let downloadAttr = $(el).attr("data-download") || "[]";
 
-      let parsedDownload;
+      let downloads = [];
       try {
-        parsedDownload = JSON.parse(downloadAttr);
-      } catch (e) {
-        parsedDownload = [];
-      }
-
-      streaming.push({
-        episode,
-        embed
-      });
-
-      parsedDownload.forEach((srv) => {
-        srv.qualities.forEach((q) => {
-          downloads.push({
-            episode,
-            server: srv.server,
-            quality: q.quality,
-            url: q.url
+        let parsed = JSON.parse(downloadAttr);
+        parsed.forEach((srv) => {
+          srv.qualities.forEach((q) => {
+            downloads.push({
+              server: srv.server,
+              quality: q.quality,
+              url: q.url
+            });
           });
         });
+      } catch (e) {}
+
+      episodeList.push({
+        episode,
+        embed,
+        downloads
       });
     });
 
-    // Bikin HTML list episode
-    let epList = streaming
+    // Build HTML snippet for blogger
+    let epListHtml = episodeList
       .map((ep) => {
-        let epDownloads = downloads.filter((d) => d.episode === ep.episode);
-
-        let downloadGrouped = [];
-        for (let d of epDownloads) {
-          let srv = downloadGrouped.find((s) => s.server === d.server);
-          if (!srv) {
-            srv = {
-              server: d.server,
-              qualities: []
-            };
-            downloadGrouped.push(srv);
-          }
-          srv.qualities.push({
-            quality: d.quality,
-            url: d.url
-          });
-        }
-
         return `
         <li>
           <div class="DagPlayOpt on"
             data-embed="${ep.embed}"
             data-id="Server-1"
             data-episode="${ep.episode}"
-            data-download='${JSON.stringify(downloadGrouped)}'>
+            data-download='${JSON.stringify(
+              groupDownloads(ep.downloads)
+            )}'>
             <span>${ep.episode}</span>
           </div>
         </li>
@@ -99,7 +83,6 @@ export default async function handler(req, res) {
       })
       .join("\n");
 
-    // Buat HTML final
     let htmlTemplate = `
 <!-- Gambar Poster -->
 <div class="separator" style="clear: both;"><a href="${poster}" style="display: block; padding: 1em 0; text-align: center;"><img alt="" border="0" height="320" src="${poster}"/></a></div>
@@ -184,7 +167,7 @@ export default async function handler(req, res) {
     </div>
     <div id="server">
       <ul id="Server-1" class="serverEpisode" style="display: block;">
-        ${epList}
+        ${epListHtml}
       </ul>
     </div>
   </div>
@@ -290,8 +273,28 @@ document.addEventListener("DOMContentLoaded", function() {
     `;
 
     res.status(200).json({ html: htmlTemplate });
+
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Gagal scraping data." });
   }
+}
+
+function groupDownloads(list) {
+  let grouped = [];
+  for (let d of list) {
+    let srv = grouped.find((s) => s.server === d.server);
+    if (!srv) {
+      srv = {
+        server: d.server,
+        qualities: []
+      };
+      grouped.push(srv);
+    }
+    srv.qualities.push({
+      quality: d.quality,
+      url: d.url
+    });
+  }
+  return grouped;
 }
