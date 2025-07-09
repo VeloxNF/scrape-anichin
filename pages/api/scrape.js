@@ -15,7 +15,8 @@ export default async function handler(req, res) {
       }
     });
 
-    const $ = cheerio.load(response.data);
+    const html = response.data;
+    const $ = cheerio.load(html);
 
     // ----- POSTER -----
     const poster = $('meta[property="og:image"]').attr("content") || "";
@@ -44,19 +45,15 @@ export default async function handler(req, res) {
       genre: "-"
     };
 
-    // cari di halaman parent
     if ($(".single-info .info-content").length) {
       $(".single-info .info-content").each((i, el) => {
-        const label = $(el).find(".sepr::before").text().trim().toLowerCase();
         const text = $(el).text().trim();
-
         if (text.includes("Ongoing") || text.includes("Completed")) {
           info.status = text;
         }
       });
     }
 
-    // genre list
     let genre = [];
     $(".genxed a").each((i, el) => {
       const text = $(el).text().trim();
@@ -66,7 +63,6 @@ export default async function handler(req, res) {
       info.genre = genre.join(", ");
     }
 
-    // fallback genre if exist
     if (info.genre === "-") {
       info.genre = $(".js-genre").text().trim() || "-";
     }
@@ -100,7 +96,6 @@ export default async function handler(req, res) {
       });
     });
 
-    // Kalau nggak ada episode list (halaman episode tunggal), scrape iframe
     if (episodeList.length === 0) {
       const iframeSrc = $("#embed_holder iframe").attr("src") || "";
       if (iframeSrc) {
@@ -112,7 +107,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Build HTML episode list
     let epListHtml = episodeList
       .map((ep) => {
         return `
@@ -129,7 +123,6 @@ export default async function handler(req, res) {
       })
       .join("\n");
 
-    // ----- FINAL HTML TEMPLATE -----
     const htmlTemplate = `
 <!-- Gambar Poster -->
 <div class="separator" style="clear: both;"><a href="${poster}" style="display: block; padding: 1em 0; text-align: center;"><img alt="" border="0" height="320" src="${poster}"/></a></div>
@@ -167,7 +160,7 @@ export default async function handler(req, res) {
 
     <!-- Video Navigation -->
     <div class="video-nav">
-      <!-- ... ikon nav ... -->
+      <!-- ikon nav -->
     </div>
   </div>
 
@@ -261,9 +254,10 @@ document.addEventListener("DOMContentLoaded", function() {
   document.querySelector(".js-genre").textContent = "${info.genre}";
 });
 </script>
-`;
+    `;
 
     res.status(200).json({ html: htmlTemplate });
+
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Gagal scraping data." });
