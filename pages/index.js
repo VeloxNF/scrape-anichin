@@ -5,13 +5,13 @@ export default function Home() {
   const [html, setHtml] = useState("");
 
   const handleScrape = async () => {
-    const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
-    const data = await res.json();
+  const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+  const data = await res.json();
 
-    if (data.error) {
-      setHtml(data.error);
-      return;
-    }
+  if (data.error) {
+    setHtml(data.error);
+    return;
+  }
 
     // ⬇️ HATI-HATI DI SINI: ganti epList → data.epList
     const html = `
@@ -203,30 +203,40 @@ document.addEventListener("DOMContentLoaded", function() {
 </style>
     `;
 
-    setHtml(html);
+  // Supaya tampil sebagai kode, escape tag < >:
+    const escapedHtml = html
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    setHtml(escapedHtml);
   };
 
   return (
-    <div>
+    <div style={{ background: "#000", color: "#fff", minHeight: "100vh", padding: "20px" }}>
       <h1>Scrape Anichin</h1>
       <input
         type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Paste URL Anichin di sini..."
-        style={{ width: "500px", marginRight: "10px" }}
+        style={{ width: "80%", marginRight: "10px" }}
       />
       <button onClick={handleScrape}>Scrape</button>
 
-      <div
-        style={{
-          marginTop: "20px",
-          background: "#1e1e1e",
-          padding: "20px",
-          color: "#fff"
-        }}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      {html && (
+        <pre
+          style={{
+            color: "#fff",
+            background: "#222",
+            padding: "20px",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all",
+            marginTop: "20px",
+          }}
+        >
+          {html}
+        </pre>
+      )}
     </div>
   );
 }
