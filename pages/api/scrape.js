@@ -22,46 +22,44 @@ export default async function handler(req, res) {
     const poster = $('meta[property="og:image"]').attr("content") || "";
 
     // ----- SINOPSIS -----
+    // Ambil bagian Indonesia aja
     let synopsis = "-";
-
-    // Check in parent page
     if ($(".entry-content").length) {
-      synopsis = $(".entry-content").html()?.trim() || "-";
-    }
-    if (synopsis === "-" && $("#syn-target").length) {
-      synopsis = $("#syn-target").html()?.trim() || "-";
+    synopsis = $(".entry-content").html()?.trim() || "-";
     }
 
-    // ----- INFO (status, etc.) -----
+    // ----- INFO (status, studio, durasi, dll) -----
     let info = {
-      status: "-",
-      studio: "-",
-      durasi: "-",
-      negara: "-",
-      episode: "-",
-      network: "-",
-      tanggalRilis: "-",
-      season: "-",
-      genre: "-"
+    status: "-",
+    studio: "-",
+    durasi: "-",
+    negara: "-",
+    episode: "-",
+    network: "-",
+    tanggalRilis: "-",
+    season: "-",
+    genre: "-"
     };
 
-    if ($(".single-info .info-content").length) {
-      $(".single-info .info-content").each((i, el) => {
-        const text = $(el).text().trim();
-        if (text.includes("Ongoing") || text.includes("Completed")) {
-          info.status = text;
-        }
-      });
-    }
-
-    let genre = [];
-    $(".genxed a").each((i, el) => {
-      const text = $(el).text().trim();
-      if (text) genre.push(text);
+    // Ambil dari .spe span
+    $(".spe span").each((i, el) => {
+    const text = $(el).text().trim();
+    if (text.includes("Status:")) info.status = text.replace("Status:", "").trim();
+    if (text.includes("Studio:")) info.studio = $(el).find("a").text().trim();
+    if (text.includes("Duration:")) info.durasi = text.replace("Duration:", "").trim();
+    if (text.includes("Country:")) info.negara = $(el).find("a").text().trim();
+    if (text.includes("Episodes:")) info.episode = text.replace("Episodes:", "").trim();
+    if (text.includes("Network:")) info.network = $(el).find("a").text().trim();
+    if (text.includes("Released:")) info.tanggalRilis = text.replace("Released:", "").trim();
+    if (text.includes("Season:")) info.season = $(el).find("a").text().trim();
     });
-    if (genre.length) {
-      info.genre = genre.join(", ");
-    }
+
+    // Genre dari .genxed
+    let genres = [];
+    $(".genxed a").each((i, el) => {
+    genres.push($(el).text().trim());
+    });
+    if (genres.length) info.genre = genres.join(", ");
 
     if (info.genre === "-") {
       info.genre = $(".js-genre").text().trim() || "-";
@@ -96,15 +94,20 @@ export default async function handler(req, res) {
       });
     });
 
+    // Kalau nggak ada episode list (halaman episode tunggal), scrape iframe
     if (episodeList.length === 0) {
-      const iframeSrc = $("#embed_holder iframe").attr("src") || "";
-      if (iframeSrc) {
+    const iframeSrc = $("#embed_holder iframe").attr("src") || "";
+    const title = $("title").text() || "";
+    const episodeMatch = title.match(/Episode\s+(\d+)/i);
+    const episode = episodeMatch ? episodeMatch[1] : "-";
+
+    if (iframeSrc) {
         episodeList.push({
-          episode: "-",
-          embed: iframeSrc,
-          downloads: []
+        episode,
+        embed: iframeSrc,
+        downloads: []
         });
-      }
+    }
     }
 
     let epListHtml = episodeList
