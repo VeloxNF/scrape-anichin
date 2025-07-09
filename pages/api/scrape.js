@@ -2,7 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 
 export default async function handler(req, res) {
-  let { url } = req.query;
+  const { url } = req.query;
 
   if (!url) {
     return res.status(400).json({ error: "URL is required." });
@@ -17,27 +17,63 @@ export default async function handler(req, res) {
 
     const $ = cheerio.load(response.data);
 
-    // Scrape poster
-    let poster = $('meta[property="og:image"]').attr("content") || "";
+    // ----- POSTER -----
+    const poster = $('meta[property="og:image"]').attr("content") || "";
 
-    // Scrape synopsis
-    let synopsis = $("#syn-target").html() || "-";
+    // ----- SINOPSIS -----
+    let synopsis = "-";
 
-    // Scrape info
+    // Check in parent page
+    if ($(".entry-content").length) {
+      synopsis = $(".entry-content").html()?.trim() || "-";
+    }
+    if (synopsis === "-" && $("#syn-target").length) {
+      synopsis = $("#syn-target").html()?.trim() || "-";
+    }
+
+    // ----- INFO (status, etc.) -----
     let info = {
-      status: $(".js-status").text().trim() || "-",
-      studio: $(".js-studio").text().trim() || "-",
-      durasi: $(".js-duration").text().trim() || "-",
-      negara: $(".js-negara").text().trim() || "-",
-      episode: $(".js-episode").text().trim() || "-",
-      network: $(".js-network").text().trim() || "-",
-      tanggalRilis: $(".js-tanggalrilis").text().trim() || "-",
-      season: $(".js-season").text().trim() || "-",
-      genre: $(".js-genre").text().trim() || "-"
+      status: "-",
+      studio: "-",
+      durasi: "-",
+      negara: "-",
+      episode: "-",
+      network: "-",
+      tanggalRilis: "-",
+      season: "-",
+      genre: "-"
     };
 
-    // Scrape all episode blocks
+    // cari di halaman parent
+    if ($(".single-info .info-content").length) {
+      $(".single-info .info-content").each((i, el) => {
+        const label = $(el).find(".sepr::before").text().trim().toLowerCase();
+        const text = $(el).text().trim();
+
+        if (text.includes("Ongoing") || text.includes("Completed")) {
+          info.status = text;
+        }
+      });
+    }
+
+    // genre list
+    let genre = [];
+    $(".genxed a").each((i, el) => {
+      const text = $(el).text().trim();
+      if (text) genre.push(text);
+    });
+    if (genre.length) {
+      info.genre = genre.join(", ");
+    }
+
+    // fallback genre if exist
+    if (info.genre === "-") {
+      info.genre = $(".js-genre").text().trim() || "-";
+    }
+
+    // ----- EPISODES + DOWNLOADS -----
     let episodeList = [];
+
     $(".DagPlayOpt").each((i, el) => {
       let embed = $(el).attr("data-embed") || "";
       let episode = $(el).attr("data-episode") || "-";
@@ -64,7 +100,19 @@ export default async function handler(req, res) {
       });
     });
 
-    // Build HTML snippet for blogger
+    // Kalau nggak ada episode list (halaman episode tunggal), scrape iframe
+    if (episodeList.length === 0) {
+      const iframeSrc = $("#embed_holder iframe").attr("src") || "";
+      if (iframeSrc) {
+        episodeList.push({
+          episode: "-",
+          embed: iframeSrc,
+          downloads: []
+        });
+      }
+    }
+
+    // Build HTML episode list
     let epListHtml = episodeList
       .map((ep) => {
         return `
@@ -73,9 +121,7 @@ export default async function handler(req, res) {
             data-embed="${ep.embed}"
             data-id="Server-1"
             data-episode="${ep.episode}"
-            data-download='${JSON.stringify(
-              groupDownloads(ep.downloads)
-            )}'>
+            data-download='${JSON.stringify(groupDownloads(ep.downloads))}'>
             <span>${ep.episode}</span>
           </div>
         </li>
@@ -83,7 +129,8 @@ export default async function handler(req, res) {
       })
       .join("\n");
 
-    let htmlTemplate = `
+    // ----- FINAL HTML TEMPLATE -----
+    const htmlTemplate = `
 <!-- Gambar Poster -->
 <div class="separator" style="clear: both;"><a href="${poster}" style="display: block; padding: 1em 0; text-align: center;"><img alt="" border="0" height="320" src="${poster}"/></a></div>
 
@@ -120,39 +167,7 @@ export default async function handler(req, res) {
 
     <!-- Video Navigation -->
     <div class="video-nav">
-      <div class="itemleft">
-        <div class="icon DagLight">
-          <svg viewBox="0 0 24 24">
-            <path fill="currentColor" d="M20,11H23V13H20V11M1,11H4V13H1V11M13,1V4H11V1H13M4.92,3.5L7.05,5.64L5.63,7.05L3.5,4.93L4.92,3.5M16.95,5.63L19.07,3.5L20.5,4.93L18.37,7.05L16.95,5.63M12,6A6,6 0 0,1 18,12C18,14.22 16.79,16.16 15,17.2V19A1,1 0 0,1 14,20H10A1,1 0 0,1 9,19V17.2C7.21,16.16 6,14.22 6,12A6,6 0 0,1 12,6M14,21V22A1,1 0 0,1 13,23H11A1,1 0 0,1 10,22V21H14M11,18H13V15.87C14.73,15.43 16,13.86 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12C8,13.86 9.27,15.43 11,15.87V18Z"></path>
-          </svg>
-          <span>Turn on Light</span>
-        </div>
-        <div class="icon DagShre">
-          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24">
-            <g fill="none">
-              <path d="M3 3h6v2H5v4H3V3z" fill="currentColor"></path>
-              <path d="M3 21h6v-2H5v-4H3v6z" fill="currentColor"></path>
-              <path d="M15 21h6v-6h-2v4h-4v2z" fill="currentColor"></path>
-              <path d="M21 3h-6v2h4v4h2V3z" fill="currentColor"></path>
-            </g>
-          </svg>
-          <a>Expand</a>
-        </div>
-        <div class="icon DagCom">
-          <svg viewBox="0 0 24 24">
-            <path fill="currentColor" d="M12,23A1,1 0 0,1 11,22V19H7A2,2 0 0,1 5,17V7A2,2 0 0,1 7,5H21A2,2 0 0,1 23,7V17A2,2 0 0,1 21,19H16.9L13.2,22.71C13,22.89 12.76,23 12.5,23H12M3,15H1V3A2,2 0 0,1 3,1H19V3H3V15Z"></path>
-          </svg>
-          <a href="#comments"><span>Comments</span></a>
-        </div>
-      </div>
-      <div class="itemright">
-        <div class="icon Report">
-          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="0.38em" height="1em" viewBox="0 0 192 512">
-            <path d="M176 432c0 44.112-35.888 80-80 80s-80-35.888-80-80s35.888-80 80-80s80 35.888 80 80zM25.26 25.199l13.6 272C39.499 309.972 50.041 320 62.83 320h66.34c12.789 0 23.331-10.028 23.97-22.801l13.6-272C167.425 11.49 156.496 0 142.77 0H49.23C35.504 0 24.575 11.49 25.26 25.199z" fill="currentColor"></path>
-          </svg>
-          <span>Report</span>
-        </div>
-      </div>
+      <!-- ... ikon nav ... -->
     </div>
   </div>
 
@@ -246,34 +261,9 @@ document.addEventListener("DOMContentLoaded", function() {
   document.querySelector(".js-genre").textContent = "${info.genre}";
 });
 </script>
-
-<style>
-.custom-dropdown {
-  background-color: #333333;
-  color: #ffffff !important;
-  border: 1px solid #333333;
-  padding: 8px 12px;
-  font-size: 14px;
-  border-radius: 4px;
-  width: 150px;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-}
-
-.custom-dropdown option {
-  background-color: #333333;
-  color: #ffffff;
-}
-</style>
-    `;
+`;
 
     res.status(200).json({ html: htmlTemplate });
-
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Gagal scraping data." });
